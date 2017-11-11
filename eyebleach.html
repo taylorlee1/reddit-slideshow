@@ -1,0 +1,306 @@
+<html>
+    <head>
+    <script src="https://cdn.jsdelivr.net/npm/reddit.js@0.1.4/reddit.min.js"></script>
+    <style>
+    #app {
+      width: 92vw;
+      margin: 0 auto;
+      /*border: 1px white solid;/**/
+    }
+    
+    .div-img {
+      width: 90%;
+      margin: 0 auto;
+      /*border: 1px lightblue solid;/**/
+    }
+    
+    #controls {
+      clear: both;
+      width: 80vw;
+      height: 9%;
+      border: 1px blue solid;
+    
+    }
+    
+    #slider {
+      width: 10vw;
+      height: 90%;
+      display: inline-block;
+      background-color: gray;
+      float: right;
+      clear: none;
+      border: 1px yellow dashed;/**/
+    
+    }
+    
+    #main-pic {
+      display: inline-block;
+      width: 80vw;
+      height: 90%;
+      float: left;
+      clear: none;
+      border: 1px yellow dashed;/**/
+    }
+    
+    .main-pic {
+      width: 80%;
+      height: 90%;
+      object-fit: contain;
+      margin: 0 auto;
+    }
+    
+    body {
+      background-color: black;
+    }
+    
+    .image { 
+      opacity: 0; 
+      transition: opacity .5s; 
+      transition-delay: .5s;
+      transition-timing-function: ease-in-out;
+      }
+    
+    .image-loaded { 
+      opacity: 1; 
+      transition: opacity .5s; 
+      transition-delay: .5s;
+      transition-timing-function: ease-in-out;
+      }
+    
+    </style>
+    </head>
+    <body>
+    
+    <div id="app"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.14.7/react.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.14.7/react-dom.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.23/browser.min.js"></script>
+    <script type="text/babel">
+      var IMG_TIME = 5000;
+    
+    
+      class Slider extends React.Component {
+        constructor(props, context) {
+          super(props, context);
+        }
+    
+        render() {
+          return (
+            <div id="slider">
+            </div>
+          );
+        }
+      }
+    
+      class Controls extends React.Component {
+        constructor(props, context) {
+          super(props, context);
+        }
+    
+        render() {
+          return (
+            <div id="controls">
+              <button onClick={this.props.onNavBack} style={{float: 'left', display: 'inline-block', marginRight: '40%'}}>back</button>
+              <button onClick={this.props.onNavPause} style={{float: 'left', display: 'inline-block'}}>pause</button>
+              <button onClick={this.props.onNavForward} style={{float: 'right', display: 'inline-block'}}>forward</button>
+            </div>
+          );
+        }
+      }
+    
+      class FadeImage extends React.Component {
+        constructor(props, context) {
+          super(props, context);
+          console.log("cmonbros");
+          this.state = {
+            loaded: false,
+            stopTimer: false,
+            paused: false,
+          }
+    
+          this.onImageLoad = this.onImageLoad.bind(this);
+        }
+    
+        onImageLoad() {
+          //console.log("FadeImage.onImageLoad()");
+          this.setState({ loaded: true });
+          var that = this;
+          this.timerLoad = setTimeout(function() {
+            that.setState({ loaded: false });
+            var those = that;
+            that.timerUnload = setTimeout(function() {
+              those.props.onImgUnload();
+            }, 1000);
+          }, this.props.imgTime);
+        }
+    
+        componentDidMount() {
+          console.log("componentDidMount() start");
+        }
+    
+        componentWillUnmount() {
+          console.log("componentWillUnmount() start");
+        }
+    
+        componentWillReceiveProps(nextProps) {
+          console.log("FadeImage.componentWillReceiveProps() " + JSON.stringify(nextProps));
+          if (nextProps.stopTimer) {
+            clearTimeout(this.timerLoad);
+            this.setState({ paused: true });
+            console.log("stop the timer!");
+          }
+    
+          if (!nextProps.stopTimer && this.state.paused) {
+            console.log("OK TO RESTART");
+            this.onImageLoad();
+            this.setState({ paused: false });
+          }
+        }
+    
+        render() {
+          //console.log("FadeImage.render() " + this.props.src);
+          var classes = 'main-pic image';
+          if (this.state.loaded) {
+            classes += ' image-loaded';
+          }
+          //console.log("FadeImage.render() " + classes);
+          return (
+            <img 
+              onLoad={this.onImageLoad} 
+              ref="img" 
+              src={this.props.src} 
+              className={classes}
+              />
+          );
+        }
+      }
+    
+      class App extends React.Component {
+        constructor(props, context) {
+          super(props, context);
+    
+          this.state = {
+            last : '',
+            shownPicture : null,
+            imgClasses : this.imgLoading,
+            imgTime : IMG_TIME,
+            picIdx : -1,
+            stopTimer : false,
+          }
+    
+          this.picQueue = [];
+          this.subreddit = 'nsfw';
+          
+          this.getPics = this.getPics.bind(this);
+          this.nextPicture = this.nextPicture.bind(this);
+    
+          this.navPause = this.navPause.bind(this);
+          this.navBack = this.navBack.bind(this);
+          this.navForward = this.navForward.bind(this);
+        }
+    
+        componentDidMount() {
+          this.getPics();
+        }
+        
+        componentDidUpdate() {
+          window.scrollTo(0, 0);
+        }
+    
+        nextPicture() {
+          console.log("App.nextPicture() queue len,pos %s, %s", this.picQueue.length, this.state.picIdx);
+          if (this.state.picIdx + 5 > this.picQueue.length) {
+            this.getPics();
+          }
+          this.setState({
+            picIdx : this.state.picIdx + 1,
+            currentPicture : this.picQueue[this.state.picIdx+1],
+          });
+        }
+    
+        getPics() {
+          console.log("after: " + this.state.last);
+          var validSuffix = /^(gif|jpg|png|gifv)$/;
+          var last = null;
+          var that = this;
+          reddit.hot(this.subreddit).after(this.state.last).fetch(function(res) {
+            var c = res.data.children;
+            console.log(c);
+            for (var i in c) {
+              var url = c[i].data.url.toLowerCase();
+              var toks = url.split('.');
+              console.log(toks[toks.length-1]);
+              if (validSuffix.test(toks[toks.length-1])) {
+                that.picQueue.push(c[i].data.url);
+              }
+              
+              console.log(that.picQueue.length);
+              console.log(c[i].data.url);
+              var last = c[i].data.name;
+            }
+            
+            console.log(that.picQueue.length);
+            that.setState({
+              last : last,
+            });
+    
+            that.nextPicture();
+            console.log("getPics() done");
+          });
+        }
+    
+        navPause() {
+          console.log("navPause() " + this.state.stopTimer);
+          this.setState({
+            stopTimer : !this.state.stopTimer,
+          })
+        }
+    
+        navBack() {
+          this.setState({
+            picIdx : this.state.picIdx-1,
+          })
+        }
+    
+        navForward() {
+          this.setState({
+            picIdx : this.state.picIdx+1,
+          })
+        }
+    
+        render() {
+          var img = null;
+          if (this.state.currentPicture) {
+            img = (
+              <FadeImage
+                src={this.state.currentPicture} 
+                imgTime={this.state.imgTime}
+                onImgUnload={this.nextPicture}
+                stopTimer={this.state.stopTimer}
+                />
+            );
+          }
+          return (
+            <div>
+            <div id="main-pic">
+              {img}
+            </div>
+            <Slider />
+            <Controls
+              onNavPause={this.navPause}
+              onNavBack={this.navBack}
+              onNavForward={this.navForward}
+              />
+            </div>
+          );
+        }
+      }
+    
+      ReactDOM.render(<App />, document.getElementById('app'));
+    </script>
+    
+    
+    </script>
+    </body>
+    
+    </html>
